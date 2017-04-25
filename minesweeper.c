@@ -27,7 +27,7 @@ int game_mode = INPUT_MODE;
 * This is a recursive function which uncovers blank cells while they are adjacent
 */
 /*This is a recursive function which uncovers blank cells while they are adjacent*/
-bool isOutofBound = (rows[i] >= 0 && rows[i] < MAX) && (columns[i] >= 0 && columns[i] < MAX);
+
 int uncover_blank_cell(int row, int col) {
 	int value = 0;
 	int rows[8] = {};
@@ -67,7 +67,7 @@ int uncover_blank_cell(int row, int col) {
 	for (i = 0; i < 8; i++) {
 		value = table_array[rows[i]][columns[i]];
 
-		if (isOutofBound) {	// to prevent negative index and out of bounds
+		if ((rows[i] >= 0 && rows[i] < MAX) && (columns[i] >= 0 && columns[i] < MAX)) {	// to prevent negative index and out of bounds
 			if (value > 0 && value <= 8) {
 				table_array[rows[i]][columns[i]] += 10;
 			}	// it is a cell with 1-8 number so we need to uncover
@@ -234,6 +234,7 @@ void newGame(int argc, char *argv[], int nMines, char ch, int value) {
 		case 'q':
 		case 'Q':
 			endGame(argc, argv, nMines, ch, value);
+			break;
 		default:
 			break;
 		}
