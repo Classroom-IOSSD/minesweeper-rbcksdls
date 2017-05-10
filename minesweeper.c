@@ -3,30 +3,31 @@
 * @author rbcksdls <rbcksdls@naver.com>
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include "conio.h"
-#include "color.h"
-#define MAX 10
+#include "function.h"
 
-#define INPUT_MODE 0
-#define FLAG_MODE 1
-#define CHECK_MODE 2
+_Bool has_mine(unsigned int cell) {
+	return BITMASK_CHECK(cell, MINE_MASK);
+}
 
-// global variables
-/// global variables
-// game table
-unsigned char table_array[MAX][MAX];
-// location of cursor
-int x = 0;
-int y = 0;
-int game_mode = INPUT_MODE;
+_Bool is_uncovered(unsigned int cell) {
+	return BITMASK_CHECK(cell, UNCOVERED_MASK);
+}
 
-/**
-* This is a recursive function which uncovers blank cells while they are adjacent
-*/
-/*This is a recursive function which uncovers blank cells while they are adjacent*/
+_Bool is_flagged(unsigned int cell) {
+	return BITMASK_CHECK(cell, FLAG_MASK);
+}
+
+void put_mine(unsigned int *cell) {
+	BITMASK_SET(*cell, MINE_MASK);
+}
+
+unsigned int num_mines(unsigned int cell) {
+	int numMines = 0;
+
+	numMines = (cell & 0x01);
+
+	return numMines;
+}
 
 int uncover_blank_cell(int row, int col) {
 	int value = 0;
@@ -37,7 +38,7 @@ int uncover_blank_cell(int row, int col) {
 	if (table_array[row][col] != 0) {
 		return 0; // error
 	}
-	table_array[row][col] += 10; // uncover current cell
+	BITMASK_SET(table_array[row][col], UNCOVERED_MASK); // uncover current cell
 
 								 // Get position of adjacent cells of current cell
 	rows[0] = row - 1;
@@ -69,7 +70,7 @@ int uncover_blank_cell(int row, int col) {
 
 		if ((rows[i] >= 0 && rows[i] < MAX) && (columns[i] >= 0 && columns[i] < MAX)) {	// to prevent negative index and out of bounds
 			if (value > 0 && value <= 8) {
-				table_array[rows[i]][columns[i]] += 10;
+				BITMASK_SET(table_array[rows[i]][columns[i]], UNCOVERED_MASK);
 			}	// it is a cell with 1-8 number so we need to uncover
 			else if (value == 0) {
 				uncover_blank_cell(rows[i], columns[i]);
@@ -100,15 +101,15 @@ void print_table() {
 			}
 			value = table_array[i][j];
 
-			if ((value >= 0 && value <= 8) || value == 0 || value == 99)
+			if (!is_uncovered(value))
 				printf("|X");
-			else if (value == 10) // clean area
-				printf("|%s%d%s", KCYN, value - 10, KNRM);
-			else if (value == 11) // the number of near mine is 1
-				printf("|%s%d%s", KYEL, value - 10, KNRM);
-			else if (value > 11 && value <= 18) // the number of near mine is greater than 1
-				printf("|%s%d%s", KRED, value - 10, KNRM);
-			else if ((value >= 20 && value <= 28) || value == 100)
+			else if (num_mines(value) == 0) // clean area
+				printf("|%s%d%s", KCYN, num_mines(value), KNRM);
+			else if (num_mines(value) == 1) // the number of near mine is 1
+				printf("|%s%d%s", KYEL, num_mines(value), KNRM);
+			else if (num_mines(value) > 1) // the number of near mine is greater than 1
+				printf("|%s%d%s", KRED, num_mines(value), KNRM);
+			else if (is_flagged(value))
 				printf("|%sF%s", KGRN, KNRM);
 			else
 				printf("ERROR"); // test purposes
@@ -170,8 +171,8 @@ void newGame(int argc, char *argv[], int nMines, char ch, int value) {
 		c = rand() % 10;
 
 		// put mines
-		if (table_array[r][c] != 99) {
-			table_array[r][c] = 99;
+		if (!has_mine(table_array[r][c])) {
+			put_mine(&table_array[r][c]);
 
 			// Get position of adjacent cells of current cell
 			rows[0] = r - 1;
@@ -194,7 +195,7 @@ void newGame(int argc, char *argv[], int nMines, char ch, int value) {
 			for (j = 0; j < 8; j++) {
 				value = table_array[rows[j]][columns[j]];
 				if ((rows[j] >= 0 && rows[j] < MAX) && (columns[j] >= 0 && columns[j] < MAX)) {	// to prevent negative index and out of bounds
-					if (value != 99)																// to prevent remove mines
+					if (!has_mine(value))																// to prevent remove mines
 						table_array[rows[j]][columns[j]] += 1;									// sums 1 to each adjacent cell
 				}
 			}
@@ -298,15 +299,15 @@ void flagMode(int argc, char *argv[], char direction, int nMines, int value, cha
 		else if (direction == '\n') {
 			value = table_array[y][x];
 
-			if (value == 99) {				// mine case
+			if (has_mine(value)) {				// mine case
 				table_array[y][x] += 1;
 				nMines -= 1;				// mine found
 			}
-			else if (value >= 0 && value <= 8) {	// number of mines case (the next cell is a mine)
-				table_array[y][x] += 20;
+			else if (!is_uncovered(value)) {	// number of mines case (the next cell is a mine)
+				BITMASK_SET(table_array[y][x], FLAG_MASK);
 			}
-			else if (value >= 20 && value <= 28) {
-				table_array[y][x] -= 20;
+			else if (is_flagged(value)) {
+				BITMASK_SET(table_array[y][x], ~(FLAG_MASK));
 			}
 
 			if (nMines == 0)
@@ -346,10 +347,10 @@ void checkMode(int argc, char *argv[], char direction, int nMines, int value, ch
 			value = table_array[y][x];
 			if (value == 0)						// blank case
 				uncover_blank_cell(y, x);
-			else if (value == 99)				// mine case
+			else if (has_mine(value))				// mine case
 				endGame(argc, argv, nMines, ch, value);
-			else if (value > 0 && value <= 8)	// number case (the next cell is a mine)
-				table_array[y][x] += 10;
+			else if ((value & 0x10) == 0)	// number case (the next cell is a mine)
+				BITMASK_SET(table_array[y][x], UNCOVERED_MASK);
 
 			//	break;
 		}
